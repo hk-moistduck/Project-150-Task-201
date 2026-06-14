@@ -4,8 +4,14 @@
 
 
 int game_is_running = FALSE;
+
 SDL_Window* window = NULL;
 SDL_Renderer* renderer = NULL;
+
+int game_is_playing = TRUE; // TRUE = playing, FALSE = game over
+int last_frame_time = 0;
+float move_timer = 0;
+float move_delay = 0.15f;
 
 typedef struct{
     int x;
@@ -20,8 +26,6 @@ typedef struct{
 } Snake;
 
 Snake snake;
-
-int game_is_playing = TRUE; // TRUE = playing, FALSE = game over
 
 int initialize_window(void){
     if(SDL_Init(SDL_INIT_EVERYTHING) != 0){
@@ -59,7 +63,7 @@ void setup(){
 
     // start moving right
     snake.direction_x = 1;
-    snake.direction_x = 0;
+    snake.direction_y = 0;
 }
 
 void process_input(){
@@ -73,18 +77,54 @@ void process_input(){
                 game_is_running = FALSE;
                 break;
             
-            // exit game loop by pressing Esc key
             case SDL_KEYDOWN:
+                // exit game loop by pressing Esc key
                 if(event.key.keysym.sym == SDLK_ESCAPE){
                     game_is_running = FALSE;
                     break;
                 }
+            
+                // input arrow keys for snake movement
+                // set the other axis direction to 0 to prevent 180 degree turn
+                if(event.key.keysym.sym == SDLK_UP && snake.direction_y == 0){
+                    snake.direction_x = 0;
+                    snake.direction_y = -1;
+                }
+                else if(event.key.keysym.sym == SDLK_DOWN && snake.direction_y == 0){
+                    snake.direction_x = 0;
+                    snake.direction_y = 1;
+                }
+                else if(event.key.keysym.sym == SDLK_RIGHT && snake.direction_x == 0){
+                    snake.direction_y = 0;
+                    snake.direction_x = 1;
+                }
+                else if(event.key.keysym.sym == SDLK_LEFT && snake.direction_x == 0){
+                    snake.direction_y = 0;
+                    snake.direction_x = -1;
+                }
+                break;
         }
     }
 }
 
 void update(){
+    float delta_time = (SDL_GetTicks64() - last_frame_time) / 1000.0f;
+    last_frame_time = SDL_GetTicks64();
 
+    // stop logic if game over
+    if(game_is_playing == FALSE) return;
+    
+    move_timer += delta_time;
+    if(move_timer >= move_delay){
+        move_timer = 0;
+
+        for(int i = snake.length - 1; i > 0; i--){
+            snake.body_position[i] = snake.body_position[i - 1];
+        }
+
+        snake.body_position[0].x += snake.direction_x;
+        snake.body_position[0].y += snake.direction_y;
+    }
 }
 
 void render(){
@@ -92,7 +132,7 @@ void render(){
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
 
-    if(game_is_playing = TRUE){
+    if(game_is_playing == TRUE){
         // draw snake
         SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); // green snake
         for(int i = 0; i < snake.length; i++){
