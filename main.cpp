@@ -1,17 +1,20 @@
 #include <stdio.h>
 #include <SDL2/SDL.h>
+#include <stdlib.h>
+#include <time.h>
 #include "./constants.h" //define all constants in a single place
 
 
-int game_is_running = FALSE;
+int game_is_running = FALSE; // TRUE = game is on, FALSE = game closes
 
 SDL_Window* window = NULL;
 SDL_Renderer* renderer = NULL;
 
 int game_is_playing = TRUE; // TRUE = playing, FALSE = game over
 int last_frame_time = 0;
+
 float move_timer = 0;
-float move_delay = 0.15f;
+float move_delay = 0.15f; // move snake every 0.15 seconds
 
 typedef struct{
     int x;
@@ -26,6 +29,7 @@ typedef struct{
 } Snake;
 
 Snake snake;
+Position food;
 
 int initialize_window(void){
     if(SDL_Init(SDL_INIT_EVERYTHING) != 0){
@@ -51,7 +55,32 @@ int initialize_window(void){
     return TRUE;
 }
 
+void spawn_food(){
+    // to check if food generated on snake body
+    int is_on_body;
+
+    do{
+        // assume randomly generated spot is not on snake body
+        is_on_body = FALSE;
+
+        // roll the dice for food coordinates
+        food.x = rand() % GRID_WIDTH;
+        food.y = rand() % GRID_HEIGHT;
+
+        // loop through entire snake body to look for overlap
+        for(int i = 0; i < snake.length; i++){
+            if(food.x == snake.body_position[i].x && food.y == snake.body_position[i].y){
+                is_on_body = TRUE;
+                break;
+            }
+        }
+    } while(is_on_body); // try again if food is on snake body
+}
+
 void setup(){
+    // seed random number generator for food
+    srand(time(NULL));
+
     // initialize snake in the middle of the grid
     snake.length = 3;
     snake.body_position[0].x = GRID_WIDTH / 2;
@@ -64,6 +93,8 @@ void setup(){
     // start moving right
     snake.direction_x = 1;
     snake.direction_y = 0;
+
+    spawn_food();
 }
 
 void process_input(){
@@ -114,16 +145,31 @@ void update(){
     // stop logic if game over
     if(game_is_playing == FALSE) return;
     
+    // move snake at intervals for grid step effect
     move_timer += delta_time;
     if(move_timer >= move_delay){
         move_timer = 0;
 
+        // shift every snake body tile position to the one in front of it
         for(int i = snake.length - 1; i > 0; i--){
             snake.body_position[i] = snake.body_position[i - 1];
         }
 
+        // apply snake head direction
         snake.body_position[0].x += snake.direction_x;
         snake.body_position[0].y += snake.direction_y;
+
+        // grow snake body by 1 when snake head eats food
+        if(snake.body_position[0].x == food.x && snake.body_position[0].y == food.y){
+            Position current_tail_position = snake.body_position[snake.length - 1];
+
+            snake.length++;
+
+            // assign new snake tail at old tail position
+            snake.body_position[snake.length - 1] = current_tail_position;
+
+            spawn_food();
+        }
     }
 }
 
@@ -136,7 +182,7 @@ void render(){
         // draw snake
         SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); // green snake
         for(int i = 0; i < snake.length; i++){
-            SDL_Rect snake_rect {
+            SDL_Rect snake_rect = {
                 snake.body_position[i].x * TILE_SIZE,
                 snake.body_position[i].y * TILE_SIZE,
                 TILE_SIZE,
@@ -144,6 +190,16 @@ void render(){
             };
             SDL_RenderFillRect(renderer, &snake_rect);
         }
+
+        // draw food
+        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // red food
+        SDL_Rect food_rect = {
+            food.x * TILE_SIZE,
+            food.y * TILE_SIZE, 
+            TILE_SIZE, 
+            TILE_SIZE
+        };
+        SDL_RenderFillRect(renderer, &food_rect);
     }
 
     SDL_RenderPresent(renderer);
