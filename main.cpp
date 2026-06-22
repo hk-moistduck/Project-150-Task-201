@@ -16,6 +16,8 @@ int last_frame_time = 0;
 float move_timer = 0;
 float move_delay = 0.15f; // move snake every 0.15 seconds
 
+int can_turn_snake_head = TRUE;; // flag to prevent self collision bug when pressing two keys very fast
+
 typedef struct{
     int x;
     int y;
@@ -116,24 +118,29 @@ void process_input(){
                 }
             
                 // input arrow keys for snake movement
-                // set the other axis direction to 0 to prevent 180 degree turn
-                if(event.key.keysym.sym == SDLK_UP && snake.direction_y == 0){
-                    snake.direction_x = 0;
-                    snake.direction_y = -1;
-                }
-                else if(event.key.keysym.sym == SDLK_DOWN && snake.direction_y == 0){
-                    snake.direction_x = 0;
-                    snake.direction_y = 1;
-                }
-                else if(event.key.keysym.sym == SDLK_RIGHT && snake.direction_x == 0){
-                    snake.direction_y = 0;
-                    snake.direction_x = 1;
-                }
-                else if(event.key.keysym.sym == SDLK_LEFT && snake.direction_x == 0){
-                    snake.direction_y = 0;
-                    snake.direction_x = -1;
-                }
-                break;
+                if(can_turn_snake_head == TRUE)
+                    // set the other axis direction to 0 to prevent 180 degree turn
+                    if(event.key.keysym.sym == SDLK_UP && snake.direction_y == 0){
+                        snake.direction_x = 0;
+                        snake.direction_y = -1;
+                        can_turn_snake_head = FALSE;
+                    }
+                    else if(event.key.keysym.sym == SDLK_DOWN && snake.direction_y == 0){
+                        snake.direction_x = 0;
+                        snake.direction_y = 1;
+                        can_turn_snake_head = FALSE;
+                    }
+                    else if(event.key.keysym.sym == SDLK_RIGHT && snake.direction_x == 0){
+                        snake.direction_y = 0;
+                        snake.direction_x = 1;
+                        can_turn_snake_head = FALSE;
+                    }
+                    else if(event.key.keysym.sym == SDLK_LEFT && snake.direction_x == 0){
+                        snake.direction_y = 0;
+                        snake.direction_x = -1;
+                        can_turn_snake_head = FALSE;
+                    }
+                    break;
         }
     }
 }
@@ -154,10 +161,25 @@ void update(){
         for(int i = snake.length - 1; i > 0; i--){
             snake.body_position[i] = snake.body_position[i - 1];
         }
+        can_turn_snake_head = TRUE;
 
         // apply snake head direction
         snake.body_position[0].x += snake.direction_x;
         snake.body_position[0].y += snake.direction_y;
+
+        // boundary collisions
+        if(snake.body_position[0].x < 0 || snake.body_position[0].x >= GRID_WIDTH ||
+            snake.body_position[0].y < 0 || snake.body_position[0].y >= GRID_HEIGHT){
+                game_is_playing = FALSE;
+            }
+
+        // self collisions
+        for(int i = 1; i < snake.length; i++){
+            if(snake.body_position[0].x == snake.body_position[i].x &&
+                snake.body_position[0].y == snake.body_position[i].y){
+                    game_is_playing = FALSE;
+                }
+        }
 
         // grow snake body by 1 when snake head eats food
         if(snake.body_position[0].x == food.x && snake.body_position[0].y == food.y){
