@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_ttf.h>
 #include <stdlib.h>
 #include <time.h>
 #include "./constants.h" //define all constants in a single place
@@ -9,9 +10,11 @@ int game_is_running = FALSE; // TRUE = game is on, FALSE = game closes
 
 SDL_Window* window = NULL;
 SDL_Renderer* renderer = NULL;
+TTF_Font* game_font = NULL;
 
 int game_is_playing = TRUE; // TRUE = playing, FALSE = game over
 int last_frame_time = 0;
+int score = 0;
 
 float move_timer = 0;
 float move_delay = 0.15f; // move snake every 0.15 seconds
@@ -54,6 +57,11 @@ int initialize_window(void){
         return FALSE;
     }
 
+    if(TTF_Init() == -1){
+        fprintf(stderr, "Error creating SDL ttf: %s\n", TTF_GetError());
+        return FALSE;
+    }
+
     return TRUE;
 }
 
@@ -79,6 +87,22 @@ void spawn_food(){
     } while(is_on_body); // try again if food is on snake body
 }
 
+void render_text(const char* text, int x, int y, SDL_Color color){
+    if(game_font == NULL) return;
+
+    SDL_Surface* surface = TTF_RenderText_Solid(game_font, text, color);
+    if(surface == NULL) return;
+
+    SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
+
+    SDL_Rect destination_rect = {x, y, surface -> w * 2, surface -> h * 2};
+
+    SDL_RenderCopy(renderer, texture, NULL, &destination_rect);
+
+    SDL_FreeSurface(surface);
+    SDL_DestroyTexture(texture);
+}
+
 void setup(){
     // seed random number generator for food
     srand(time(NULL));
@@ -97,6 +121,11 @@ void setup(){
     snake.direction_y = 0;
 
     spawn_food();
+
+    game_font = TTF_OpenFont("assets/Minecraft.ttf", 16);
+    if(game_font == NULL){
+        fprintf(stderr, "Error loading font: %s\n", TTF_GetError());
+    }
 }
 
 void process_input(){
@@ -186,6 +215,7 @@ void update(){
             Position current_tail_position = snake.body_position[snake.length - 1];
 
             snake.length++;
+            score += 10;
 
             // assign new snake tail at old tail position
             snake.body_position[snake.length - 1] = current_tail_position;
@@ -223,6 +253,12 @@ void render(){
         };
         SDL_RenderFillRect(renderer, &food_rect);
     }
+
+    SDL_Color white_color = { 255, 255, 255, 255};
+    char score_string[32];
+    sprintf(score_string, "Score: %d", score);
+
+    render_text(score_string, 20, 20, white_color);
 
     SDL_RenderPresent(renderer);
 }
