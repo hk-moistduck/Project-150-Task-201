@@ -17,7 +17,7 @@ int last_frame_time = 0;
 int score = 0;
 
 float move_timer = 0;
-float move_delay = 0.15f; // move snake every 0.15 seconds
+float move_delay = 0.12f; // move snake every 0.12 seconds
 
 int can_turn_snake_head = TRUE;; // flag to prevent self collision bug when pressing two keys very fast
 
@@ -79,29 +79,33 @@ void spawn_food(){
 
         // loop through entire snake body to look for overlap
         for(int i = 0; i < snake.length; i++){
-            if(food.x == snake.body_position[i].x && food.y == snake.body_position[i].y){
-                is_on_body = TRUE;
-                break;
+            if(food.x == snake.body_position[i].x && 
+                food.y == snake.body_position[i].y){
+                    is_on_body = TRUE;
+                    break;
             }
         }
     } while(is_on_body); // try again if food is on snake body
 }
 
-void render_text(const char* text, int x, int y, SDL_Color color){
-    if(game_font == NULL) return;
+SDL_Texture* create_text_texture(
+    const char* text, SDL_Color color, int scale,
+    int* output_width, int* output_height){
+        if(game_font == NULL) return NULL;
 
-    SDL_Surface* surface = TTF_RenderText_Solid(game_font, text, color);
-    if(surface == NULL) return;
+        // draw surface (CPU memory)
+        SDL_Surface* surface = TTF_RenderText_Solid(game_font, text, color);
+        if(surface == NULL) return NULL;
 
-    SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
+        // draw texture (GPU memory)
+        SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
 
-    SDL_Rect destination_rect = {x, y, surface -> w * 2, surface -> h * 2};
+        *output_width = surface -> w * scale;
+        *output_height = surface -> h * scale;
 
-    SDL_RenderCopy(renderer, texture, NULL, &destination_rect);
-
-    SDL_FreeSurface(surface);
-    SDL_DestroyTexture(texture);
-}
+        SDL_FreeSurface(surface);
+        return texture;
+    }
 
 void setup(){
     // seed random number generator for food
@@ -230,6 +234,9 @@ void render(){
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
 
+    SDL_Color white_color = {255, 255, 255, 255};
+    SDL_Color red_color = {255, 0, 0, 255};
+
     if(game_is_playing == TRUE){
         // draw snake
         SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); // green snake
@@ -252,13 +259,65 @@ void render(){
             TILE_SIZE
         };
         SDL_RenderFillRect(renderer, &food_rect);
+
+        // draw score
+        int score_width, score_height;
+        char score_string[32];
+        sprintf(score_string, "Score: %d", score);
+
+        SDL_Texture* score_texture = create_text_texture(
+                                        score_string,
+                                        white_color, 
+                                        2,
+                                        &score_width, 
+                                        &score_height);
+        if(score_texture != NULL){
+            SDL_Rect rect = { 20, 20, score_width, score_height};
+            SDL_RenderCopy(renderer, score_texture, NULL, &rect);
+            SDL_DestroyTexture(score_texture);
+        }
     }
+    // when snake collides
+    else if(game_is_playing == FALSE){
+        // draw game over screen
+        int text_width = 0;
+        int text_height = 0;
 
-    SDL_Color white_color = { 255, 255, 255, 255};
-    char score_string[32];
-    sprintf(score_string, "Score: %d", score);
+        // draw game over text
+        SDL_Texture* game_over_texture = create_text_texture(
+                                                            "GAME OVER",
+                                                            red_color,
+                                                            3,
+                                                            &text_width,
+                                                            &text_height);
+        if(game_over_texture != NULL){
+            int text_x_position = (WINDOW_WIDTH - text_width) / 2;
+            int text_y_position = (WINDOW_HEIGHT / 2) - text_height - 10;
 
-    render_text(score_string, 20, 20, white_color);
+            SDL_Rect rect = {text_x_position, text_y_position, text_width, text_height};
+            SDL_RenderCopy(renderer, game_over_texture, NULL, &rect);
+            SDL_DestroyTexture(game_over_texture);
+        }
+
+        // draw final score text
+        char final_score_string[64];
+        sprintf(final_score_string, "Final score: %d", score);
+
+        SDL_Texture* score_texture = create_text_texture(
+                                                        final_score_string,
+                                                        white_color,
+                                                        2,
+                                                        &text_width,
+                                                        &text_height);
+        if(score_texture != NULL){
+            int text_x_position = (WINDOW_WIDTH - text_width) / 2;
+            int text_y_position = (WINDOW_HEIGHT / 2) + 10;
+
+            SDL_Rect rect = {text_x_position, text_y_position, text_width, text_height};
+            SDL_RenderCopy(renderer, score_texture, NULL, &rect);
+            SDL_DestroyTexture(score_texture);
+        }
+    }
 
     SDL_RenderPresent(renderer);
 }
